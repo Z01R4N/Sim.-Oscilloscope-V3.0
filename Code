@@ -1,0 +1,105 @@
+"""
+Simulated Osciloscope - Version 3.0
+Last Updated: Nov. 28, 2023
+"""
+
+#Imports
+import pyaudio
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+#Caputre Audio - Input
+#Frames per buffer
+CHUNK = 1024
+#Format of input
+FORMAT = pyaudio.paInt16
+#Number of audio channels
+CHANNELS = 1
+#Samples per second
+RATE = 44100
+
+def captureAudio():
+    #Create an empty DataFrame to store data
+    data_frame = pd.DataFrame(columns = ["Sound Level (dB)"])
+
+    try:
+        audio = pyaudio.PyAudio()
+        stream = audio.open(
+            format = FORMAT,
+            channels = CHANNELS,
+            rate = RATE,
+            input = True,
+            frames_per_buffer = CHUNK)
+
+        print("Listening...")
+
+        #Measure sound levels for a certain amount of time
+        counter = 0
+        while counter < 1000:
+            #Read audio data
+            data = stream.read(CHUNK)
+            #Convert data to a numpy array
+            audioData = np.frombuffer(data, dtype = np.int16)
+            #Calculate RMS
+            rms = np.sqrt(np.mean(audioData**2))
+            #Calculate dB level
+            dB = 20 * np.log10(rms)
+            #Append the data to the DataFrame
+            data_frame = pd.concat([data_frame, pd.DataFrame({"Sound Level (dB)": [dB]})], ignore_index =True)
+            #Increment counter
+            counter += 1
+
+    #User terminates the program through Ctrl + C
+    except KeyboardInterrupt:
+        print("Program terminated")
+
+    #Unexpected error catch
+    except Exception as e:
+        print(f"An unexpected error occured: {str(e)}")
+
+    #Close audio stream and save data to the Excel file
+    finally:
+        if 'stream' in locals() and stream.is_active():
+            stream.stop_stream()
+            stream.close()
+        if 'audio' in locals():
+            audio.terminate()
+
+        #Save the DataFrame to an Excel file with a unique name
+        file_counter = 1
+        while os.path.exists(f"audioData_{file_counter}.xlsx"):
+            file_counter += 1
+        data_frame.to_excel(f"audioData_{file_counter}.xlsx", index = False)
+
+        #Create a graph showing the data in a decibels over time format
+        plt.plot(data_frame["Sound Level (dB)"])
+        plt.title("Sound Level over Time")
+        plt.xlabel("Time (Iterations)")
+        plt.ylabel("Sound Level (dB)")
+        plt.show()
+
+if __name__ == "__main__":
+    while True:
+        print("Menu:")
+        print("1. Generate a new graph.")
+        print("2. General Information")
+        print("3. Terminate program")
+
+        user_input = input()
+        if user_input == '1':
+            captureAudio()
+        elif user_input == '2':
+            print("This program works as a simulated osciloscope, taking in audio input from a mircophone input and converting it into a graphical format in volume over time.")
+            print("To use this program, press 1 to begin audio recording and begin speaking and/or singing. The volume of your voice will be measured and converted into decibles (dB).")
+            print("The data that's collected will be stored in a seperate Excel file that's created by the program: audioData_[Number].xlsx, with 'Number' representing the amount of times you ran the program.")
+            print("These Excel files are saved seperately for future analasys and can be opened like any other Excel file.")
+            print("When you are finished recording your voice early, press Ctrl + C to end the recording early and convert what you have into a graphical format. Otherwise, the program will automatically stop recording after 1000 iterations (approximately 28 seconds).")
+        elif user_input == '3':
+            print("Closing application. Goodbye.")
+            break
+        else:
+            print("Invalid input. Please choose from the options provided.")
+        
